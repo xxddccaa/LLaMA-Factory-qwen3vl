@@ -37,6 +37,8 @@ class DatasetAttr:
     split: str = "train"
     folder: Optional[str] = None
     num_samples: Optional[int] = None
+    # 新增：数据集级别的 media_dir 配置
+    media_dir: Optional[str] = None
     # common columns
     system: Optional[str] = None
     tools: Optional[str] = None
@@ -76,6 +78,8 @@ class DatasetAttr:
         self.set_attr("split", attr, default="train")
         self.set_attr("folder", attr)
         self.set_attr("num_samples", attr)
+        # 新增：解析数据集级别的 media_dir
+        self.set_attr("media_dir", attr)
 
         if "columns" in attr:
             column_names = ["prompt", "query", "response", "history", "messages", "system", "tools"]

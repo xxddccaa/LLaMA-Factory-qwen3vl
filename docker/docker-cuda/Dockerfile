@@ -3,7 +3,9 @@ ARG BASE_IMAGE=hiyouga/pytorch:th2.6.0-cu124-flashattn2.7.4-cxx11abi0-devel
 FROM ${BASE_IMAGE}
 
 # Installation arguments
-ARG PIP_INDEX=https://pypi.org/simple
+# ARG PIP_INDEX=https://pypi.org/simple
+# 清华镜像源 (直接在pip命令中使用硬编码URL，不再需要ARG)
+# ARG PIP_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple
 ARG EXTRAS=metrics
 ARG INSTALL_FLASHATTN=false
 ARG HTTP_PROXY=""
@@ -18,33 +20,79 @@ ENV PIP_ROOT_USER_ACTION=ignore
 ENV http_proxy="${HTTP_PROXY}"
 ENV https_proxy="${HTTP_PROXY}"
 
+# Set Chinese locale environment variables
+ENV LANG=zh_CN.UTF-8
+ENV LC_ALL=zh_CN.UTF-8
+ENV LANGUAGE=zh_CN:zh
+ENV TZ=Asia/Shanghai
+
 # Use Bash instead of default /bin/sh
 SHELL ["/bin/bash", "-c"]
 
 # Set the working directory
 WORKDIR /app
 
+# Install Chinese language support and fonts
+RUN apt-get update && apt-get install -y \
+    locales \
+    fonts-noto-cjk \
+    language-pack-zh-hans \
+    openssh-server \
+    zip \
+    unzip \
+    tree \
+    vim \
+    tzdata \
+    apt-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Generate Chinese locale and set timezone
+RUN locale-gen zh_CN.UTF-8 && \
+    update-locale LANG=zh_CN.UTF-8 LC_ALL=zh_CN.UTF-8 && \
+    ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+    echo "export LANG=zh_CN.UTF-8" >> /etc/bash.bashrc && \
+    echo "export LC_ALL=zh_CN.UTF-8" >> /etc/bash.bashrc
+
 # Change pip source
-RUN pip config set global.index-url "${PIP_INDEX}" && \
-    pip config set global.extra-index-url "${PIP_INDEX}" && \
-    pip install --no-cache-dir --upgrade pip packaging wheel setuptools
+RUN pip config set global.index-url "https://pypi.tuna.tsinghua.edu.cn/simple" && \
+    pip config set global.extra-index-url "https://pypi.tuna.tsinghua.edu.cn/simple" && \
+    pip install --no-cache-dir -i "https://pypi.tuna.tsinghua.edu.cn/simple" --upgrade pip packaging wheel setuptools
 
 # Install the requirements
 COPY requirements.txt /app
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -i "https://pypi.tuna.tsinghua.edu.cn/simple" -r requirements.txt
 
 # Copy the rest of the application into the image
 COPY . /app
 
 # Install LLaMA Factory
-RUN pip install --no-cache-dir -e ".[${EXTRAS}]" --no-build-isolation
+RUN pip install --no-cache-dir -i "https://pypi.tuna.tsinghua.edu.cn/simple" -e ".[${EXTRAS}]" --no-build-isolation
 
 # Rebuild flash attention
 RUN if [ "${INSTALL_FLASHATTN}" == "true" ]; then \
         pip uninstall -y ninja && \
-        pip install --no-cache-dir ninja && \
-        pip install --no-cache-dir flash-attn --no-build-isolation; \
+        pip install --no-cache-dir -i "https://pypi.tuna.tsinghua.edu.cn/simple" ninja && \
+        pip install --no-cache-dir -i "https://pypi.tuna.tsinghua.edu.cn/simple" flash-attn --no-build-isolation; \
     fi
+
+# RUN pip uninstall pillow -y && CC="cc -mavx2" pip install -U --force-reinstall pillow-simd -i "https://pypi.tuna.tsinghua.edu.cn/simple" --use-pep517
+
+# Install additional development tools
+RUN apt-get update && apt-get install -y \
+    htop \
+    tmux \
+    curl \
+    wget \
+    git \
+    file \
+    net-tools \
+    libibverbs1 \
+    libibverbs-dev \
+    libgl1-mesa-glx libglx-mesa0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Customize bash prompt
+RUN echo 'export PS1="\\[\\e[1;31m\\]\\D{%a %m月 %d} \\[\\e[0m\\]# \\[\\e[1;32m\\]\\t \\[\\e[0m\\]# \\[\\e[1;34m\\]\\w \\[\\e[0m\\]# "' >> /root/.bashrc
 
 # Set up volumes
 # VOLUME [ "/root/.cache/huggingface", "/app/shared_data", "/app/output" ]
