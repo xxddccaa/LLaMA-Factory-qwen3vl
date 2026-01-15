@@ -65,8 +65,9 @@ RUN pip install --no-cache-dir -i "https://pypi.tuna.tsinghua.edu.cn/simple" -r 
 # Copy the rest of the application into the image
 COPY . /app
 
-# Install LLaMA Factory
-RUN pip install --no-cache-dir -i "https://pypi.tuna.tsinghua.edu.cn/simple" -e ".[${EXTRAS}]" --no-build-isolation
+# Install LLaMA Factory (使用 --upgrade-strategy only-if-needed 避免重新安装 PyTorch)
+RUN pip install --no-cache-dir -i "https://pypi.tuna.tsinghua.edu.cn/simple" \
+    -e ".[${EXTRAS}]" --no-build-isolation --upgrade-strategy only-if-needed
 
 # Rebuild flash attention
 RUN if [ "${INSTALL_FLASHATTN}" == "true" ]; then \
